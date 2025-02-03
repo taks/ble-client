@@ -263,10 +263,17 @@ impl BLERemoteCharacteristic {
       .contains(GattCharacteristicProperties::BROADCAST)
   }
 
-  pub(crate) unsafe fn notify(&mut self, om: *mut esp_idf_sys::os_mbuf) {
+  pub(crate) unsafe fn notify(&mut self, mut om: *mut esp_idf_sys::os_mbuf) {
     if let Some(no_notify) = self.state.on_notify.as_mut() {
-      let data = unsafe { core::slice::from_raw_parts((*om).om_data, (*om).om_len as _) };
-      no_notify(data);
+      let mut buf = Vec::with_capacity(esp_idf_sys::BLE_ATT_ATTR_MAX_LEN as _);
+
+      while !om.is_null() {
+        let slice = unsafe { core::slice::from_raw_parts((*om).om_data, (*om).om_len as _) };
+        buf.extend_from_slice(slice);
+        om = unsafe { (*om).om_next.sle_next };
+      }
+
+      no_notify(&buf);
     }
   }
 }
